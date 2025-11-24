@@ -1,143 +1,73 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <title>Enter Access Code</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Access Code Validation</title>
   <style>
-    :root{--bg:#f6f8fb;--card:#ffffff;--muted:#6b7280;--accent:#0f62fe}
-    *{box-sizing:border-box}
-    body{font-family:Inter, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;background:var(--bg);margin:0;min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px}
-    .card{background:var(--card);max-width:520px;width:100%;border-radius:12px;box-shadow:0 6px 18px rgba(15,22,39,0.06);padding:28px}
-    h1{margin:0 0 8px;font-size:20px}
-    p.lead{margin:0 0 20px;color:var(--muted)}
-    form{display:grid;gap:12px}
-    label{font-size:13px;color:var(--muted)}
-    input[type="text"]{width:100%;padding:12px 14px;border:1px solid #e6e9ef;border-radius:8px;font-size:15px}
-    .row{display:flex;gap:8px}
-    button{background:var(--accent);color:#fff;border:0;padding:10px 14px;border-radius:8px;font-weight:600;cursor:pointer}
-    button[disabled]{opacity:.6;cursor:default}
-    .msg{padding:12px;border-radius:8px;font-size:14px}
-    .msg.info{background:#eef6ff;color:#0f4bd8;border:1px solid #d7e8ff}
-    .msg.success{background:#ecfdf5;color:#05664b;border:1px solid #c7f0da}
-    .msg.warning{background:#fff8e6;color:#6b4b00;border:1px solid #ffe9b3}
-    .msg.error{background:#fff1f2;color:#7a0920;border:1px solid #ffd0d8}
-    .hint{font-size:13px;color:var(--muted)}
-    .link-btn{display:inline-block;margin-top:8px;padding:10px 12px;border-radius:8px;border:1px solid #e6e9ef;background:#fff;color:#111;text-decoration:none}
-    footer{margin-top:16px;font-size:12px;color:var(--muted)}
-    .spinner{display:inline-block;width:16px;height:16px;border:2px solid rgba(255,255,255,0.3);border-left-color:rgba(255,255,255,0.9);border-radius:50%;animation:spin 1s linear infinite;vertical-align:middle;margin-left:8px}
-    @keyframes spin{to{transform:rotate(360deg)}}
+    body { font-family: Arial, sans-serif; background-color: #f4f6f8; display: flex; justify-content: center; align-items: center; height: 100vh; margin: 0; }
+    .container { background: #fff; padding: 30px; border-radius: 12px; box-shadow: 0 6px 18px rgba(0,0,0,0.1); width: 100%; max-width: 400px; text-align: center; }
+    h2 { margin-bottom: 20px; color: #111; }
+    input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid #ccc; font-size: 16px; margin-bottom: 15px; }
+    button { padding: 12px 20px; border: none; border-radius: 8px; background-color: #0f62fe; color: #fff; font-size: 16px; cursor: pointer; }
+    button:disabled { opacity: 0.6; cursor: not-allowed; }
+    p.message { margin-top: 15px; font-size: 14px; }
+    p.message.success { color: #05664b; }
+    p.message.warning { color: #6b4b00; }
+    p.message.error { color: #7a0920; }
+    a.link-btn { display: inline-block; margin-top: 12px; padding: 10px 16px; background: #0f62fe; color: #fff; border-radius: 8px; text-decoration: none; }
   </style>
 </head>
 <body>
-  <div class="card" role="main">
-    <h1>Enter your access code</h1>
-    <p class="lead">Type the one-time access code you received to open the ballot.</p>
-
-    <form id="codeForm" autocomplete="off">
-      <div>
-        <label for="code">Access code</label>
-        <input id="code" name="code" type="text" inputmode="numeric" placeholder="e.g. A1B2-C3D4" required maxlength="64" />
-      </div>
-
-      <div class="row">
-        <button id="submitBtn" type="submit">Validate code</button>
-        <button id="clearBtn" type="button">Clear</button>
-      </div>
-    </form>
-
-    <div id="responseArea" style="margin-top:14px"></div>
-
-    <footer>
-      <div class="hint">You must validate your code first to access the ballot.</div>
-    </footer>
+  <div class="container">
+    <h2>Enter Your Access Code</h2>
+    <input type="text" id="codeInput" placeholder="Enter access code" />
+    <button id="validateBtn">Validate</button>
+    <p id="message" class="message"></p>
   </div>
 
   <script>
     const APPS_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbxUHehxvuKqUjRfq4OhW8IaAZyw8y9GFThUkwu-iaK8HSICLtXKl93qTSVhqN4QUpqg/exec';
-    const JOTFORM_BALLOT_URL = 'https://form.jotform.com/253272616763057';
+    const JOTFORM_URL = 'https://form.jotform.com/253272616763057';
 
-    const form = document.getElementById('codeForm');
-    const codeInput = document.getElementById('code');
-    const submitBtn = document.getElementById('submitBtn');
-    const clearBtn = document.getElementById('clearBtn');
-    const responseArea = document.getElementById('responseArea');
+    const codeInput = document.getElementById('codeInput');
+    const validateBtn = document.getElementById('validateBtn');
+    const messageEl = document.getElementById('message');
 
-    function setMessage(type, html) {
-      responseArea.innerHTML = '';
-      const div = document.createElement('div');
-      div.className = 'msg ' + (type || 'info');
-      div.innerHTML = html;
-      responseArea.appendChild(div);
-    }
-
-    function createJotformLink() {
-      const a = document.createElement('a');
-      a.href = JOTFORM_BALLOT_URL;
-      a.className = 'link-btn';
-      a.textContent = 'Open the ballot';
-      a.target = '_blank';
-      a.rel = 'noopener noreferrer';
-      return a;
-    }
-
-    clearBtn.addEventListener('click', () => {
-      codeInput.value = '';
-      responseArea.innerHTML = '';
-      codeInput.focus();
-    });
-
-    form.addEventListener('submit', async (e) => {
-      e.preventDefault();
-      responseArea.innerHTML = '';
+    validateBtn.addEventListener('click', () => {
       const code = codeInput.value.trim();
-      if (!code) { setMessage('warning', 'Please enter the access code.'); return; }
-
-      submitBtn.disabled = true;
-      submitBtn.textContent = 'Checking...';
-      const spinner = document.createElement('span'); spinner.className = 'spinner';
-      submitBtn.appendChild(spinner);
-
-      try {
-        const res = await fetch(APPS_SCRIPT_WEBAPP_URL, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code })
-        });
-
-        if (!res.ok) { const errText = await res.text(); throw new Error('Validation endpoint responded with status ' + res.status + ' — ' + errText); }
-
-        let payload;
-        const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) payload = await res.json();
-        else { const text = (await res.text()).trim(); try { payload = JSON.parse(text); } catch (_) { payload = text; } }
-
-        let statusVal = null;
-        if (typeof payload === 'string') statusVal = payload.toUpperCase();
-        else if (payload && typeof payload.status === 'string') statusVal = payload.status.toUpperCase();
-        else if (payload && typeof payload.result === 'string') statusVal = payload.result.toUpperCase();
-
-        switch (statusVal) {
-          case 'VALID':
-            setMessage('success', 'Code is valid. You may proceed to cast your vote.');
-            responseArea.appendChild(createJotformLink());
-            break;
-          case 'USED':
-            setMessage('warning', 'This code has already been used.');
-            break;
-          case 'INVALID':
-            setMessage('error', 'The code you entered is not valid.');
-            break;
-          default:
-            setMessage('error', 'Unexpected response from server.');
-        }
-      } catch (err) {
-        console.error(err);
-        setMessage('error', 'Network/server error: ' + (err.message || err));
-      } finally {
-        submitBtn.disabled = false;
-        submitBtn.textContent = 'Validate code';
+      if (!code) {
+        messageEl.textContent = 'Please enter an access code.';
+        messageEl.className = 'message warning';
+        return;
       }
+
+      validateBtn.disabled = true;
+      messageEl.textContent = 'Validating...';
+      messageEl.className = 'message';
+
+      fetch(`${APPS_SCRIPT_WEBAPP_URL}?code=${encodeURIComponent(code)}`)
+        .then(res => res.text())
+        .then(status => {
+          status = status.trim().toUpperCase();
+          if (status === 'VALID') {
+            messageEl.textContent = 'Access code valid! Redirecting to voting app...';
+            messageEl.className = 'message success';
+            setTimeout(() => { window.location.href = JOTFORM_URL; }, 2000);
+          } else if (status === 'USED') {
+            messageEl.textContent = 'This access code has already been used.';
+            messageEl.className = 'message warning';
+          } else {
+            messageEl.textContent = 'Invalid access code.';
+            messageEl.className = 'message error';
+          }
+        })
+        .catch(err => {
+          console.error(err);
+          messageEl.textContent = 'Error validating access code. Please try again later.';
+          messageEl.className = 'message error';
+        })
+        .finally(() => { validateBtn.disabled = false; });
     });
   </script>
 </body>
