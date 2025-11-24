@@ -28,7 +28,7 @@
       if (!code) return;
 
       message.innerHTML = "⏳ Checking your access code...";
-      fetch('https://script.google.com/macros/s/AKfycbxebqzJkrpTP5KALz5MHumzEyvDnbs5h9e6OBOfU71fjHGAqZa_TAkF0CH7idewfyRw/exec?code=' + encodeURIComponent(code))
+      fetch('https://script.google.com/macros/s/AKfycbwW2UBa0MAn51CVvENoLoZjMzoroMDY2knhfgaGu9FvkPSgVmyJfJA7HupxeXPu1v6I/exec' + encodeURIComponent(code))
         .then(response => response.text())
         .then(html => {
           message.innerHTML = html;
