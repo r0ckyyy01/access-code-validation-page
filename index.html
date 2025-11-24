@@ -49,15 +49,13 @@
     <div id="responseArea" style="margin-top:14px"></div>
 
     <footer>
-      <div class="hint">If your code is valid you'll be redirected or shown a link to the ballot.</div>
+      <div class="hint">You must validate your code first to access the ballot.</div>
     </footer>
   </div>
 
   <script>
-    // ======= CONFIG - replace these two values with your real endpoints =======
     const APPS_SCRIPT_WEBAPP_URL = 'https://script.google.com/macros/s/AKfycbzylbpyzdlBA4YjffLhN1ZGvF1cyAoL_KD0GChy-_OGKl-RVz5QjgHAi5YcZQjW9T7c/exec';
     const JOTFORM_BALLOT_URL = 'https://form.jotform.com/253272616763057';
-    // =======================================================================
 
     const form = document.getElementById('codeForm');
     const codeInput = document.getElementById('code');
@@ -93,43 +91,27 @@
       e.preventDefault();
       responseArea.innerHTML = '';
       const code = codeInput.value.trim();
-      if (!code) {
-        setMessage('warning', 'Please enter the access code.');
-        return;
-      }
+      if (!code) { setMessage('warning', 'Please enter the access code.'); return; }
 
-      // disable controls while validating
       submitBtn.disabled = true;
       submitBtn.textContent = 'Checking...';
       const spinner = document.createElement('span'); spinner.className = 'spinner';
       submitBtn.appendChild(spinner);
 
       try {
-        // Apps Script webapps generally support GET/POST. We'll POST JSON.
         const res = await fetch(APPS_SCRIPT_WEBAPP_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ code })
         });
 
-        if (!res.ok) {
-          // If the webapp returns an error status, try to parse text for debugging
-          const errText = await res.text();
-          throw new Error('Validation endpoint responded with status ' + res.status + ' — ' + errText);
-        }
+        if (!res.ok) { const errText = await res.text(); throw new Error('Validation endpoint responded with status ' + res.status + ' — ' + errText); }
 
-        // Some Apps Script endpoints return plain text (e.g. VALID) or JSON {status:"VALID"}
         let payload;
         const contentType = res.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          payload = await res.json();
-        } else {
-          const text = (await res.text()).trim();
-          // try to detect a JSON-looking string
-          try { payload = JSON.parse(text); } catch (_) { payload = text; }
-        }
+        if (contentType.includes('application/json')) payload = await res.json();
+        else { const text = (await res.text()).trim(); try { payload = JSON.parse(text); } catch (_) { payload = text; } }
 
-        // normalize response value
         let statusVal = null;
         if (typeof payload === 'string') statusVal = payload.toUpperCase();
         else if (payload && typeof payload.status === 'string') statusVal = payload.status.toUpperCase();
@@ -139,60 +121,24 @@
           case 'VALID':
             setMessage('success', 'Code is valid. You may proceed to cast your vote.');
             responseArea.appendChild(createJotformLink());
-            // Optional: uncomment to redirect automatically
-            // window.location.href = JOTFORM_BALLOT_URL;
             break;
           case 'USED':
-            setMessage('warning', 'This code has already been used. If you believe this is an error contact the administrator.');
+            setMessage('warning', 'This code has already been used.');
             break;
           case 'INVALID':
-            setMessage('error', 'The code you entered is not valid. Please check and try again.');
+            setMessage('error', 'The code you entered is not valid.');
             break;
           default:
-            // Unknown response - show debug info
-            setMessage('error', 'Unexpected response from validation server. <br/><small>Response:</small>');
-            const pre = document.createElement('pre'); pre.style.whiteSpace = 'pre-wrap'; pre.textContent = JSON.stringify(payload, null, 2);
-            responseArea.appendChild(pre);
+            setMessage('error', 'Unexpected response from server.');
         }
-
       } catch (err) {
         console.error(err);
-        setMessage('error', 'Network or server error while validating code. <br/><small>' + (err.message || err) + '</small>');
+        setMessage('error', 'Network/server error: ' + (err.message || err));
       } finally {
         submitBtn.disabled = false;
         submitBtn.textContent = 'Validate code';
       }
     });
-    // ======= Added Security Enhancements =======
-
-    // 1. Block access if page is not served over HTTPS (except localhost)
-    if (location.protocol !== 'https:' && location.hostname !== 'localhost' && location.hostname !== '127.0.0.1') {
-      document.body.innerHTML = '<div style="padding:20px;font-family:sans-serif;color:#b91c1c;background:#fee2e2;border:1px solid #fecaca;border-radius:8px;">This page must be accessed over a secure HTTPS connection.</div>';
-      throw new Error('Blocked non-HTTPS access');
-    }
-
-    // 2. Disable right‑click (basic obfuscation)
-    document.addEventListener('contextmenu', (e) => e.preventDefault());
-
-    // 3. Disable copy, cut, paste
-    ['copy','cut','paste'].forEach(evt => document.addEventListener(evt, e => e.preventDefault()));
-
-    // 4. Light rate‑limit: prevent multiple submissions within 2 seconds
-    let lastSubmit = 0;
-    form.addEventListener('submit', (e) => {
-      const now = Date.now();
-      if (now - lastSubmit < 2000) {
-        e.preventDefault();
-        setMessage('warning', 'Please wait a moment before trying again.');
-        return;
-      }
-      lastSubmit = now;
-    }, true);
-
-    // 5. Randomize input field "name" attribute to reduce bot targeting
-    const randomKey = 'code_' + Math.random().toString(36).substring(2, 10);
-    codeInput.setAttribute('name', randomKey);
-
   </script>
 </body>
 </html>
